@@ -11,91 +11,49 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { Service } from "@/lib/services"
+import { ServiceCard } from "./service-card"
+import { Input } from "./ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
+import { Slider } from "./ui/slider"
+import { Checkbox } from "./ui/checkbox"
+import { Label } from "./ui/label"
 
 interface ServiceGridProps {
   initialServices: Service[]
   filters?: {
     search?: string
-    categories?: string[]
+    category?: string
     priceRange?: [number, number]
-    duration?: string[]
-    rating?: string[]
+    duration?: number
+    rating?: number
   }
 }
 
-export function ServiceGrid({ initialServices, filters = {} }: ServiceGridProps) {
+export function ServiceGrid({ initialServices, filters }: ServiceGridProps) {
   const { t, language } = useLanguage()
   const { addToCart } = useCart()
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
-
-  // Ensure filters has default values to prevent undefined errors
-  const safeFilters = {
-    search: filters.search || "",
-    categories: filters.categories || [],
-    priceRange: filters.priceRange || [0, 500000],
-    duration: filters.duration || [],
-    rating: filters.rating || [],
-  }
+  const [services] = useState(initialServices)
+  const [searchTerm, setSearchTerm] = useState(filters?.search || "")
+  const [selectedCategory, setSelectedCategory] = useState(filters?.category || "all")
+  const [priceRange, setPriceRange] = useState<[number, number]>(filters?.priceRange || [0, 1000000])
+  const [duration, setDuration] = useState(filters?.duration || 0)
+  const [selectedRatings, setSelectedRatings] = useState<number[]>([])
 
   const filteredServices = useMemo(() => {
-    return initialServices.filter((service) => {
-      // Search filter
-      if (safeFilters.search) {
-        const searchLower = safeFilters.search.toLowerCase()
-        const nameMatch =
-          service.name_en.toLowerCase().includes(searchLower) || service.name_sw.toLowerCase().includes(searchLower)
-        const descMatch =
-          service.description_en.toLowerCase().includes(searchLower) ||
-          service.description_sw.toLowerCase().includes(searchLower)
-        const categoryMatch =
-          service.category_en.toLowerCase().includes(searchLower) ||
-          service.category_sw.toLowerCase().includes(searchLower)
+    return services.filter((service) => {
+      const matchesSearch = service.name_en.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        service.name_sw.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesCategory = selectedCategory === "all" || service.category_en === selectedCategory
+      const matchesPrice = service.base_price >= priceRange[0] && service.base_price <= priceRange[1]
+      const matchesDuration = !duration || service.duration_minutes <= duration
+      const matchesRating = selectedRatings.length === 0 || selectedRatings.includes(Math.floor(service.rating))
 
-        if (!nameMatch && !descMatch && !categoryMatch) return false
-      }
-
-      // Category filter
-      if (safeFilters.categories.length > 0) {
-        if (!safeFilters.categories.includes(service.category_en)) return false
-      }
-
-      // Price filter
-      if (service.price < safeFilters.priceRange[0] || service.price > safeFilters.priceRange[1]) {
-        return false
-      }
-
-      // Duration filter
-      if (safeFilters.duration.length > 0) {
-        const serviceDurationHours = service.duration_minutes / 60
-        let matchesDuration = false
-
-        safeFilters.duration.forEach((duration) => {
-          if (duration === "Under 1 hour" && serviceDurationHours < 1) matchesDuration = true
-          if (duration === "1-2 hours" && serviceDurationHours >= 1 && serviceDurationHours <= 2) matchesDuration = true
-          if (duration === "2-4 hours" && serviceDurationHours > 2 && serviceDurationHours <= 4) matchesDuration = true
-          if (duration === "4+ hours" && serviceDurationHours > 4) matchesDuration = true
-        })
-
-        if (!matchesDuration) return false
-      }
-
-      // Rating filter
-      if (safeFilters.rating.length > 0) {
-        let matchesRating = false
-
-        safeFilters.rating.forEach((rating) => {
-          const minRating = Number.parseFloat(rating.split("+")[0])
-          if (service.rating >= minRating) matchesRating = true
-        })
-
-        if (!matchesRating) return false
-      }
-
-      return true
+      return matchesSearch && matchesCategory && matchesPrice && matchesDuration && matchesRating
     })
-  }, [initialServices, filters])
+  }, [services, searchTerm, selectedCategory, priceRange, duration, selectedRatings])
 
   const handleAddToCart = (service: Service) => {
     if (!user) {
@@ -107,12 +65,11 @@ export function ServiceGrid({ initialServices, filters = {} }: ServiceGridProps)
       id: service.id,
       name_en: service.name_en,
       name_sw: service.name_sw,
-      price: service.price,
+      price: service.base_price,
       image_url: service.image_url,
       duration_minutes: service.duration_minutes,
     })
 
-    // Show success toast
     toast({
       title: "Added to cart",
       description: `${language === "sw" ? service.name_sw : service.name_en} has been added to your cart.`,
@@ -129,74 +86,116 @@ export function ServiceGrid({ initialServices, filters = {} }: ServiceGridProps)
     router.push(`/book/${service.id}`)
   }
 
-  if (filteredServices.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No services found</h3>
-        <p className="text-gray-600">Try adjusting your filters or search terms.</p>
-      </div>
+  const handleRatingChange = (rating: number) => {
+    setSelectedRatings(prev => 
+      prev.includes(rating) 
+        ? prev.filter(r => r !== rating)
+        : [...prev, rating]
     )
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {filteredServices.map((service) => (
-        <Card key={service.id} className="group hover:shadow-lg transition-all duration-300 border-0">
-          <CardContent className="p-0">
-            <div className="aspect-[4/3] overflow-hidden rounded-t-lg relative">
-              <img
-                src={service.image_url || "/placeholder.svg"}
-                alt={language === "sw" ? service.name_sw : service.name_en}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <Badge className="absolute top-3 left-3 bg-[#2E7D32]">
-                {language === "sw" ? service.category_sw : service.category_en}
-              </Badge>
+    <div className="flex gap-6">
+      {/* Filters sidebar */}
+      <div className="hidden lg:block w-80 space-y-6">
+        <Card>
+          <CardContent className="pt-6 space-y-6">
+            <div className="space-y-4">
+              <h3 className="font-medium">Categories</h3>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="Home Cleaning">Home Cleaning</SelectItem>
+                  <SelectItem value="Gardening">Gardening</SelectItem>
+                  <SelectItem value="Plumbing">Plumbing</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="p-4">
-              <h3 className="font-semibold text-lg text-[#212121] mb-2 line-clamp-1">
-                {language === "sw" ? service.name_sw : service.name_en}
-              </h3>
-              <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                {language === "sw" ? service.description_sw : service.description_en}
-              </p>
-              <div className="flex items-center gap-4 mb-4">
-                <div className="flex items-center text-yellow-500">
-                  <Star className="w-4 h-4 fill-current" />
-                  <span className="ml-1 text-sm">{service.rating}</span>
-                </div>
-                <div className="flex items-center text-gray-500">
-                  <Clock className="w-4 h-4" />
-                  <span className="ml-1 text-sm">{service.duration_minutes} min</span>
-                </div>
+
+            <div className="space-y-4">
+              <h3 className="font-medium">Price Range</h3>
+              <Slider
+                value={[priceRange[0], priceRange[1]]}
+                onValueChange={(value) => setPriceRange([value[0], value[1]])}
+                min={0}
+                max={1000000}
+                step={10000}
+                className="w-full"
+              />
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>TSh {priceRange[0].toLocaleString()}</span>
+                <span>TSh {priceRange[1].toLocaleString()}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-semibold text-[#2E7D32]">
-                  TZS {service.price.toLocaleString()}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleAddToCart(service)}
-                    className="flex items-center gap-1"
-                  >
-                    <ShoppingCart className="w-4 h-4" />
-                    {t("Add to Cart")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => handleBookNow(service)}
-                    className="bg-[#2E7D32] hover:bg-[#1B5E20]"
-                  >
-                    {t("Book Now")}
-                  </Button>
-                </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-medium">Duration</h3>
+              <Slider
+                value={[duration]}
+                onValueChange={(value) => setDuration(value[0])}
+                min={0}
+                max={240}
+                step={30}
+                className="w-full"
+              />
+              <div className="text-sm text-gray-500 text-right">
+                {duration ? `${duration} minutes` : "Any duration"}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-medium">Rating</h3>
+              <div className="space-y-2">
+                {[5, 4, 3, 2, 1].map((rating) => (
+                  <div key={rating} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`rating-${rating}`}
+                      checked={selectedRatings.includes(rating)}
+                      onCheckedChange={() => handleRatingChange(rating)}
+                    />
+                    <Label htmlFor={`rating-${rating}`} className="flex items-center gap-1">
+                      {rating} {rating === 1 ? "Star" : "Stars"} & Up
+                    </Label>
+                  </div>
+                ))}
               </div>
             </div>
           </CardContent>
         </Card>
-      ))}
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 space-y-6">
+        <Input
+          placeholder="Search services..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full"
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredServices.map((service) => (
+            <ServiceCard
+              key={service.id}
+              service={service}
+              onAddToCart={() => handleAddToCart(service)}
+              onBookNow={() => handleBookNow(service)}
+            />
+          ))}
+        </div>
+
+        {filteredServices.length === 0 && (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium text-gray-900">No services found</h3>
+            <p className="mt-2 text-sm text-gray-500">
+              Try adjusting your search or filter criteria
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -19,6 +19,7 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
   const { login } = useAuth()
   const { t } = useLanguage()
   const router = useRouter()
@@ -26,14 +27,20 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError("")
 
-    const success = await login(email, password)
-    if (success) {
-      router.push(redirectTo || "/dashboard")
-    } else {
-      alert(t("auth.invalid_credentials"))
+    try {
+      const success = await login(email, password)
+      if (success) {
+        router.push(redirectTo || "/dashboard")
+      } else {
+        setError(t("auth.invalid_credentials"))
+      }
+    } catch (err) {
+      setError(t("auth.login_error"))
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   return (
@@ -45,7 +52,14 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="email">{t("auth.email")}</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input 
+              id="email" 
+              type="email" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              required 
+              placeholder="Enter your email"
+            />
           </div>
           <div>
             <Label htmlFor="password">{t("auth.password")}</Label>
@@ -55,8 +69,12 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              placeholder="Enter your password"
             />
           </div>
+          {error && (
+            <div className="text-red-500 text-sm">{error}</div>
+          )}
           <Button type="submit" className="w-full bg-[#2E7D32] hover:bg-[#1B5E20]" disabled={isLoading}>
             {isLoading ? t("common.loading") : t("auth.login")}
           </Button>
