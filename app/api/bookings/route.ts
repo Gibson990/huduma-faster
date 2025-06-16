@@ -67,4 +67,47 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+
+    let queryString = `
+      SELECT 
+        b.id,
+        b.service_id,
+        s.name_en as service_name,
+        b.customer_name,
+        b.customer_email,
+        b.customer_phone,
+        b.address,
+        b.booking_date,
+        b.booking_time,
+        b.total_amount,
+        b.status,
+        b.created_at
+      FROM bookings b
+      JOIN services s ON b.service_id = s.id
+    `;
+    const queryParams = [];
+
+    if (userId) {
+      queryString += ' WHERE b.customer_id = $1';
+      queryParams.push(userId);
+    }
+
+    queryString += ' ORDER BY b.created_at DESC';
+
+    const result = await query(queryString, queryParams);
+
+    return NextResponse.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching bookings:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch bookings' },
+      { status: 500 }
+    );
+  }
 } 

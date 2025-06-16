@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Service } from "@/lib/services"
-import { User } from "@/lib/auth"
+import { User } from "@/components/auth/auth-provider"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -20,6 +20,14 @@ import { cn } from "@/lib/utils"
 interface BookingFormProps {
   service: Service
   user: User
+}
+
+interface FormData {
+  name: string
+  email: string
+  phone: string
+  address: string
+  notes: string
 }
 
 // Generate time slots from 8 AM to 5 PM
@@ -35,7 +43,7 @@ export function BookingForm({ service, user }: BookingFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [date, setDate] = useState<Date>()
   const [time, setTime] = useState<string>("")
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: user.name || "",
     email: user.email || "",
     phone: user.phone || "",

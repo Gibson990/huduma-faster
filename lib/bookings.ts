@@ -1,27 +1,27 @@
 import { query } from "./db"
 
 export interface Booking {
-  id: string
-  service_id: string
+  id: number
+  service_id: number
   service_name: string
   customer_name: string
   customer_email: string
   customer_phone: string
   address: string
-  booking_date: string
+  booking_date: Date
   booking_time: string
   total_amount: number
   status: string
-  created_at: string
+  created_at: Date
 }
 
-export async function getBookingById(id: string): Promise<Booking | null> {
+export async function getBookingById(id: number): Promise<Booking | null> {
   try {
     const result = await query(
       `SELECT 
         b.id,
         b.service_id,
-        s.name as service_name,
+        s.name_en as service_name,
         b.customer_name,
         b.customer_email,
         b.customer_phone,
@@ -43,32 +43,32 @@ export async function getBookingById(id: string): Promise<Booking | null> {
 
     const booking = result.rows[0]
     return {
-      id: booking.id,
-      service_id: booking.service_id,
+      id: Number(booking.id),
+      service_id: Number(booking.service_id),
       service_name: booking.service_name,
       customer_name: booking.customer_name,
       customer_email: booking.customer_email,
       customer_phone: booking.customer_phone,
       address: booking.address,
-      booking_date: booking.booking_date.toISOString(),
+      booking_date: new Date(booking.booking_date),
       booking_time: booking.booking_time,
       total_amount: Number(booking.total_amount),
       status: booking.status,
-      created_at: booking.created_at.toISOString()
+      created_at: new Date(booking.created_at)
     }
   } catch (error) {
     console.error("Error fetching booking:", error)
-    return null
+    throw error
   }
 }
 
-export async function getUserBookings(userId: string): Promise<Booking[]> {
+export async function getUserBookings(userId: number): Promise<Booking[]> {
   try {
     const result = await query(
       `SELECT 
         b.id,
         b.service_id,
-        s.name as service_name,
+        s.name_en as service_name,
         b.customer_name,
         b.customer_email,
         b.customer_phone,
@@ -86,21 +86,21 @@ export async function getUserBookings(userId: string): Promise<Booking[]> {
     )
 
     return result.rows.map(booking => ({
-      id: booking.id,
-      service_id: booking.service_id,
+      id: Number(booking.id),
+      service_id: Number(booking.service_id),
       service_name: booking.service_name,
       customer_name: booking.customer_name,
       customer_email: booking.customer_email,
       customer_phone: booking.customer_phone,
       address: booking.address,
-      booking_date: booking.booking_date.toISOString(),
+      booking_date: new Date(booking.booking_date),
       booking_time: booking.booking_time,
       total_amount: Number(booking.total_amount),
       status: booking.status,
-      created_at: booking.created_at.toISOString()
+      created_at: new Date(booking.created_at)
     }))
   } catch (error) {
     console.error("Error fetching user bookings:", error)
-    return []
+    throw error
   }
 } 
