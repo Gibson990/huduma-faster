@@ -72,6 +72,7 @@ export function BookingForm({ service, user }: BookingFormProps) {
         },
         body: JSON.stringify({
           serviceId: service.id,
+          userId: user.id,
           ...formData,
           date: date.toISOString(),
           time,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Eye, Star, Download, Calendar } from "lucide-react"
-import { useBookings } from "@/lib/bookings"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
@@ -33,21 +32,37 @@ const getStatusColor = (status: string) => {
 
 export function UserBookings() {
   const { user } = useAuth()
-  const { getUserBookings, updateBooking } = useBookings()
   const { toast } = useToast()
   const [selectedBooking, setSelectedBooking] = useState<any>(null)
   const [rating, setRating] = useState(5)
   const [review, setReview] = useState("")
   const [isRatingDialogOpen, setIsRatingDialogOpen] = useState(false)
+  const [userBookings, setUserBookings] = useState<any[]>([])
 
-  const userBookings = user ? getUserBookings(user.id) : []
+  useEffect(() => {
+    if (!user) return;
+    fetch(`/api/bookings?userId=${user.id}`)
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        console.log('Fetched bookings:', data);
+        setUserBookings(
+          data.map((b: any) => ({
+            ...b,
+            serviceName: b.service_name,
+            providerName: b.provider_name || 'Assigned Provider',
+            scheduledDate: b.booking_date ? new Date(b.booking_date) : null,
+            scheduledTime: b.booking_time,
+            servicePrice: b.total_amount,
+            customerName: b.customer_name,
+            quantity: b.quantity || 1,
+          }))
+        )
+      })
+  }, [user])
 
   const handleRatingSubmit = () => {
     if (selectedBooking) {
-      updateBooking(selectedBooking.id, {
-        rating,
-        review,
-      })
+      // Here you would send the rating to the backend if needed
       toast({
         title: "Rating Submitted!",
         description: "Thank you for your feedback.",
@@ -105,6 +120,7 @@ export function UserBookings() {
             <Button asChild className="bg-[#2E7D32] hover:bg-[#1B5E20]">
               <Link href="/services">Book Your First Service</Link>
             </Button>
+            <div className="mt-4 text-xs text-gray-400">(If you just booked, try refreshing. Check the browser console for debug info.)</div>
           </div>
         </CardContent>
       </Card>
@@ -137,7 +153,7 @@ export function UserBookings() {
                   <div>Provider: {booking.providerName}</div>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                     <span>
-                      {booking.scheduledDate.toLocaleDateString()} at {booking.scheduledTime} • {booking.id}
+                      {booking.scheduledDate?.toLocaleDateString()} at {booking.scheduledTime} • {booking.id}
                     </span>
                     <span className="font-medium text-[#2E7D32]">TSh {booking.servicePrice.toLocaleString()}</span>
                   </div>

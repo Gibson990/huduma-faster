@@ -9,7 +9,7 @@ export async function GET(
     const result = await query(
       `SELECT 
         b.id,
-        s.name as service_name,
+        s.name_en as service_name,
         b.customer_name,
         b.customer_email,
         b.customer_phone,

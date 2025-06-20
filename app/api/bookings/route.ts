@@ -4,6 +4,7 @@ import { query } from '@/lib/db';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log("Received booking data:", body); // DEBUG LOG
     const {
       serviceId,
       name,
@@ -12,7 +13,8 @@ export async function POST(request: Request) {
       address,
       date,
       time,
-      notes
+      notes,
+      userId
     } = body;
 
     // Get service price
@@ -34,6 +36,7 @@ export async function POST(request: Request) {
     const result = await query(
       `INSERT INTO bookings (
         service_id,
+        customer_id,
         customer_name,
         customer_email,
         customer_phone,
@@ -43,10 +46,11 @@ export async function POST(request: Request) {
         total_amount,
         status,
         notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING id`,
       [
         serviceId,
+        userId,
         name,
         email,
         phone,

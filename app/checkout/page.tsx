@@ -35,18 +35,20 @@ export default function CheckoutPage() {
   const [date, setDate] = useState<Date>()
   const [time, setTime] = useState<string>("")
   const [notes, setNotes] = useState("")
+  const [phone, setPhone] = useState(user?.phone || "")
+  const [address, setAddress] = useState(user?.address || "")
 
   useEffect(() => {
     if (!user) {
       router.push("/login?redirect=/checkout")
       return
     }
-
-    if (cart.length === 0) {
+    // Only redirect to /services if not submitting a booking
+    if (cart.length === 0 && !isSubmitting) {
       router.push("/services")
       return
     }
-  }, [user, cart, router])
+  }, [user, cart, router, isSubmitting])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,32 +61,50 @@ export default function CheckoutPage() {
       return
     }
 
+    console.log("User object:", user); // DEBUG: Check user object
+    console.log("User ID:", user.id); // DEBUG: Check user ID specifically
+
     setIsSubmitting(true)
     try {
-      const response = await fetch("/api/bookings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          serviceId: cart[0].id,
+      // Loop through all cart items and create bookings for each
+      const bookingIds: string[] = []
+      for (const item of cart) {
+        const requestBody = {
+          serviceId: item.id,
+          userId: user.id,
           name: user.name,
           email: user.email,
-          phone: user.phone || "",
-          address: user.address || "",
+          phone,
+          address,
           date: date.toISOString(),
           time,
           notes,
-        }),
-      })
+        };
+        
+        console.log("Request body being sent:", requestBody); // DEBUG: Check request body
+        
+        const response = await fetch("/api/bookings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        })
 
-      if (!response.ok) {
-        throw new Error("Failed to create booking")
+        if (!response.ok) {
+          throw new Error("Failed to create booking")
+        }
+
+        const data = await response.json()
+        bookingIds.push(data.id)
       }
-
-      const data = await response.json()
       clearCart()
-      router.push(`/invoice/${data.id}`)
+      // Redirect to summary or invoice page
+      if (bookingIds.length > 1) {
+        router.push(`/order-summary?ids=${bookingIds.join(",")}`)
+      } else {
+        router.push(`/invoice/${bookingIds[0]}`)
+      }
     } catch (error) {
       console.error("Error creating booking:", error)
       toast({
@@ -200,18 +220,20 @@ export default function CheckoutPage() {
                 <Label>{language === "sw" ? "Simu" : "Phone"}</Label>
                 <input
                   type="tel"
-                  value={user.phone || ""}
-                  disabled
-                  className="w-full p-2 border rounded-md bg-gray-50"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  required
+                  className="w-full p-2 border rounded-md"
                 />
               </div>
               <div>
                 <Label>{language === "sw" ? "Anwani" : "Address"}</Label>
                 <input
                   type="text"
-                  value={user.address || ""}
-                  disabled
-                  className="w-full p-2 border rounded-md bg-gray-50"
+                  value={address}
+                  onChange={e => setAddress(e.target.value)}
+                  required
+                  className="w-full p-2 border rounded-md"
                 />
               </div>
 
