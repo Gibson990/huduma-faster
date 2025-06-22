@@ -41,11 +41,26 @@ const providers = [
 export function RecentBookings({ showAll = false }: { showAll?: boolean }) {
   const { toast } = useToast()
   const [allBookings, setAllBookings] = useState<any[]>([])
+  
   useEffect(() => {
     fetch('/api/bookings')
       .then(res => res.ok ? res.json() : [])
-      .then(data => setAllBookings(data))
+      .then(data => {
+        // Transform the data to match the expected format
+        const transformedData = data.map((booking: any) => ({
+          ...booking,
+          serviceName: booking.service_name,
+          providerName: booking.provider_name || 'Unassigned',
+          scheduledDate: booking.booking_date ? new Date(booking.booking_date) : null,
+          scheduledTime: booking.booking_time,
+          servicePrice: booking.total_amount,
+          customerName: booking.customer_name,
+          quantity: booking.quantity || 1,
+        }))
+        setAllBookings(transformedData)
+      })
   }, [])
+  
   const displayBookings = showAll ? allBookings : allBookings.slice(0, 5)
   const [selectedBooking, setSelectedBooking] = useState<any>(null)
   const [selectedProvider, setSelectedProvider] = useState<string>("")
@@ -110,9 +125,9 @@ export function RecentBookings({ showAll = false }: { showAll?: boolean }) {
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                     <span>
-                      {booking.scheduledDate.toLocaleDateString()} • {booking.providerName}
+                      {booking.scheduledDate ? booking.scheduledDate.toLocaleDateString() : 'No date'} • {booking.providerName}
                     </span>
-                    <span className="font-medium text-[#2E7D32]">TSh {booking.servicePrice.toLocaleString()}</span>
+                    <span className="font-medium text-[#2E7D32]">TSh {booking.servicePrice?.toLocaleString() || '0'}</span>
                   </div>
                 </div>
               </div>
