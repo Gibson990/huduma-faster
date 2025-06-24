@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,62 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-
-// Initial providers data
-const initialProviders = [
-  {
-    id: 1,
-    name: "Mike Johnson",
-    email: "mike@providers.com",
-    phone: "+255700001001",
-    specialization: "Electrical Services",
-    rating: 4.8,
-    totalJobs: 156,
-    status: "active",
-    verified: true,
-    location: "Dar es Salaam",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1000",
-  },
-  {
-    id: 2,
-    name: "Sarah Wilson",
-    email: "sarah@providers.com",
-    phone: "+255700001002",
-    specialization: "Plumbing Services",
-    rating: 4.6,
-    totalJobs: 98,
-    status: "active",
-    verified: true,
-    location: "Arusha",
-    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=1000",
-  },
-  {
-    id: 3,
-    name: "David Brown",
-    email: "david@providers.com",
-    phone: "+255700001003",
-    specialization: "Cleaning Services",
-    rating: 4.9,
-    totalJobs: 203,
-    status: "active",
-    verified: true,
-    location: "Mwanza",
-    image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=1000",
-  },
-  {
-    id: 4,
-    name: "Lisa Garcia",
-    email: "lisa@providers.com",
-    phone: "+255700001004",
-    specialization: "Carpentry",
-    rating: 4.7,
-    totalJobs: 134,
-    status: "inactive",
-    verified: false,
-    location: "Dodoma",
-    image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=1000",
-  },
-]
+import bcrypt from "bcryptjs"
 
 // Available specializations
 const specializations = [
@@ -84,8 +29,15 @@ const specializations = [
 // Available locations
 const locations = ["Dar es Salaam", "Arusha", "Mwanza", "Dodoma", "Mbeya", "Moshi", "Tanga", "Zanzibar"]
 
+// Add Tanzanian sample names for new providers
+const sampleNames = [
+  "Juma Mwalimu", "Amina Salehe", "Hassan Mwangi", "Grace Kimani", "Mohamed Ali", "Fatma Hassan", "John Mwita", "Neema Mushi", "Peter Mwakalebela", "Zainabu Omari"
+];
+
+const testImage = "https://randomuser.me/api/portraits/men/3.jpg"
+
 export function ProviderManagement() {
-  const [providers, setProviders] = useState(initialProviders)
+  const [providers, setProviders] = useState<any[]>([])
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
@@ -94,12 +46,24 @@ export function ProviderManagement() {
 
   // New provider form state
   const [newProvider, setNewProvider] = useState({
-    name: "",
+    name: sampleNames[Math.floor(Math.random() * sampleNames.length)],
     email: "",
     phone: "",
     specialization: "",
-    location: "",
+    location: locations[Math.floor(Math.random() * locations.length)],
+    password: "",
+    image: "",
+    rating: 4.5,
+    totalJobs: 0,
+    verified: false,
   })
+
+  // Fetch providers on mount
+  useEffect(() => {
+    fetch("/api/providers")
+      .then((res) => res.json())
+      .then(setProviders)
+  }, [])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -110,79 +74,56 @@ export function ProviderManagement() {
     setNewProvider((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleAddProvider = () => {
-    // Validate form
-    if (
-      !newProvider.name ||
-      !newProvider.email ||
-      !newProvider.phone ||
-      !newProvider.specialization ||
-      !newProvider.location
-    ) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
+  const handleAddProvider = async () => {
+    if (!newProvider.name || !newProvider.email || !newProvider.phone || !newProvider.specialization || !newProvider.location || !newProvider.password || !newProvider.image) {
+      toast({ title: "Validation Error", description: "Please fill in all required fields", variant: "destructive" })
       return
     }
-
-    // Add new provider
-    const newId = Math.max(...providers.map((p) => p.id)) + 1
-    const provider = {
-      id: newId,
+    const password_hash = await bcrypt.hash(newProvider.password, 10)
+    const payload = {
       name: newProvider.name,
       email: newProvider.email,
       phone: newProvider.phone,
+      password_hash,
+      is_active: true,
+      image: newProvider.image,
       specialization: newProvider.specialization,
       location: newProvider.location,
-      rating: 0,
-      totalJobs: 0,
-      status: "active",
-      verified: false,
-      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=1000", // Default image for new providers
+      rating: newProvider.rating,
+      totalJobs: newProvider.totalJobs,
+      verified: newProvider.verified,
     }
-
-    setProviders([...providers, provider])
+    const res = await fetch("/api/providers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const created = await res.json()
+    setProviders((prev) => [created, ...prev])
     setIsAddDialogOpen(false)
-    setNewProvider({
-      name: "",
-      email: "",
-      phone: "",
-      specialization: "",
-      location: "",
-    })
-
-    toast({
-      title: "Provider Added",
-      description: `${provider.name} has been added as a service provider`,
-      variant: "success",
-    })
+    setNewProvider({ name: sampleNames[Math.floor(Math.random() * sampleNames.length)], email: "", phone: "", specialization: "", location: locations[Math.floor(Math.random() * locations.length)], password: "", image: "", rating: 4.5, totalJobs: 0, verified: false })
+    toast({ title: "Provider Added", description: `${created.name} has been added as a service provider`, variant: "success" })
   }
 
-  const handleDeleteProvider = () => {
+  const handleDeleteProvider = async () => {
     if (selectedProvider) {
-      setProviders(providers.filter((p) => p.id !== selectedProvider.id))
+      await fetch(`/api/providers/${selectedProvider.id}`, { method: "DELETE" })
+      setProviders((prev) => prev.filter((p) => p.id !== selectedProvider.id))
       setIsDeleteDialogOpen(false)
       setSelectedProvider(null)
-
-      toast({
-        title: "Provider Deleted",
-        description: `${selectedProvider.name} has been removed from service providers`,
-        variant: "success",
-      })
+      toast({ title: "Provider Deleted", description: `${selectedProvider.name} has been removed from service providers`, variant: "success" })
     }
   }
 
-  const toggleProviderStatus = (provider: any) => {
-    const newStatus = provider.status === "active" ? "inactive" : "active"
-    setProviders(providers.map((p) => (p.id === provider.id ? { ...p, status: newStatus } : p)))
-
-    toast({
-      title: `Provider ${newStatus === "active" ? "Activated" : "Deactivated"}`,
-      description: `${provider.name} has been ${newStatus === "active" ? "activated" : "deactivated"}`,
-      variant: "success",
+  const toggleProviderStatus = async (provider: any) => {
+    const res = await fetch(`/api/providers/${provider.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: !provider.is_active }),
     })
+    const updated = await res.json()
+    setProviders((prev) => prev.map((p) => (p.id === provider.id ? updated : p)))
+    toast({ title: `Provider ${updated.is_active ? "Activated" : "Deactivated"}`, description: `${provider.name} has been ${updated.is_active ? "activated" : "deactivated"}`, variant: "success" })
   }
 
   const openDetailsDialog = (provider: any) => {
@@ -218,7 +159,7 @@ export function ProviderManagement() {
                   <td className="py-3 px-4">
                     <div className="flex items-center space-x-3">
                       <img
-                        src={provider.image || "/placeholder.svg?height=40&width=40"}
+                        src={provider.image && provider.image.trim() !== "" ? provider.image : testImage}
                         alt={provider.name}
                         className="w-10 h-10 rounded-full object-cover"
                       />
@@ -240,21 +181,17 @@ export function ProviderManagement() {
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-sm text-gray-600">{provider.specialization}</td>
+                  <td className="py-3 px-4 text-sm text-gray-600">{provider.specialization || "N/A"}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center">
                       <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
                       <span className="text-sm font-medium">{provider.rating}</span>
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-sm text-gray-600">{provider.totalJobs}</td>
+                  <td className="py-3 px-4 text-sm text-gray-600">{typeof provider.totalJobs === "number" ? provider.totalJobs : 0}</td>
                   <td className="py-3 px-4">
-                    <Badge
-                      className={
-                        provider.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                      }
-                    >
-                      {provider.status}
+                    <Badge className={provider.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                      {provider.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </td>
                   <td className="py-3 px-4">
@@ -270,25 +207,19 @@ export function ProviderManagement() {
                           <span>View Details</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => toggleProviderStatus(provider)}>
-                          {provider.status === "active" ? (
+                          {provider.is_active ? (
                             <>
-                              <UserX className="mr-2 h-4 w-4" />
+                              <UserX className="mr-2 h-4 w-4 text-red-600" />
                               <span>Deactivate</span>
                             </>
                           ) : (
                             <>
-                              <UserCheck className="mr-2 h-4 w-4" />
+                              <UserCheck className="mr-2 h-4 w-4 text-green-600" />
                               <span>Activate</span>
                             </>
                           )}
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedProvider(provider)
-                            setIsDeleteDialogOpen(true)
-                          }}
-                          className="text-red-600"
-                        >
+                        <DropdownMenuItem onClick={() => { setSelectedProvider(provider); setIsDeleteDialogOpen(true); }} className="text-red-600">
                           <Trash className="mr-2 h-4 w-4" />
                           <span>Delete</span>
                         </DropdownMenuItem>
@@ -371,6 +302,27 @@ export function ProviderManagement() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={newProvider.password}
+                  onChange={handleInputChange}
+                  placeholder="Enter password"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="image">Profile Image URL</Label>
+                <Input
+                  id="image"
+                  name="image"
+                  value={newProvider.image}
+                  onChange={handleInputChange}
+                  placeholder="https://example.com/profile.jpg"
+                />
               </div>
             </div>
             <DialogFooter>

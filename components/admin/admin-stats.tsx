@@ -2,10 +2,17 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, ShoppingBag, DollarSign, Clock } from "lucide-react"
-import { useBookings } from "@/lib/bookings"
+import { useAdminBookings } from "@/lib/bookings"
 
 export function AdminStats() {
-  const { getTotalRevenue, getPendingBookingsCount, getCompletedBookingsCount, getAllBookings } = useBookings()
+  const { getTotalRevenue, getPendingBookingsCount, getCompletedBookingsCount, getAllBookings, loading, error } = useAdminBookings()
+
+  if (loading) {
+    return <div>Loading admin stats...</div>
+  }
+  if (error) {
+    return <div className="text-red-500">Error loading stats: {error}</div>
+  }
 
   const totalRevenue = getTotalRevenue()
   const pendingBookings = getPendingBookingsCount()

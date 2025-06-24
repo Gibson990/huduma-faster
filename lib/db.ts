@@ -1,42 +1,39 @@
 import { Pool } from 'pg'
 
-// Create a new pool using a direct connection string
+// Create a new pool using a connection string
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'huduma_db',
-  password: '54642323',
-  port: 5432
+  connectionString: 'postgresql://postgres:54642323@localhost:5432/huduma_db'
 })
 
 // Test the connection when the module is loaded
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err)
+  process.exit(-1)
 })
 
 export async function query(text: string, params?: any[]) {
   const client = await pool.connect()
   try {
     const result = await client.query(text, params)
-    return result.rows
-  } catch (error) {
-    console.error('Database Error:', error)
-    throw new Error('Failed to execute query')
+    return result
   } finally {
     client.release()
   }
 }
 
-export async function testConnection() {
+export async function getClient() {
   const client = await pool.connect()
+  return client
+}
+
+export async function testConnection() {
   try {
-    const result = await client.query('SELECT NOW()')
-    return { success: true, timestamp: result.rows[0].now }
+    const result = await query("SELECT NOW()")
+    console.log("Database connection successful:", result.rows[0])
+    return true
   } catch (error) {
-    console.error('Database connection error:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
-  } finally {
-    client.release()
+    console.error("Database connection failed:", error)
+    return false
   }
 }
 

@@ -1,72 +1,25 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth/auth-provider"
 import { ServiceDetails } from "@/components/service-details"
 import { BookingForm } from "@/components/booking-form"
+import { Service } from "@/lib/services"
 
-// Mock service data - in a real app, this would come from an API
-const services = [
-  {
-    id: 1,
-    name_en: "House Cleaning",
-    name_sw: "Usafi wa Nyumba",
-    description_en:
-      "Professional house cleaning service for all rooms including kitchen, bathrooms, bedrooms, and living areas.",
-    description_sw:
-      "Huduma ya kitaalamu ya usafi wa nyumba kwa vyumba vyote ikiwa ni pamoja na jiko, vyoo, vyumba vya kulala, na maeneo ya kuishi.",
-    price: 25000,
-    category: "Cleaning",
-    image_url: "/placeholder.svg?height=300&width=500&text=House+Cleaning",
-    duration_minutes: 120,
-    features: [
-      "Deep cleaning of all rooms",
-      "Kitchen and bathroom sanitization",
-      "Dusting and vacuuming",
-      "Window cleaning",
-    ],
-  },
-  {
-    id: 2,
-    name_en: "Plumbing Repair",
-    name_sw: "Matengenezo ya Mabomba",
-    description_en: "Expert plumbing repair services for leaks, clogs, installations, and other plumbing issues.",
-    description_sw:
-      "Huduma za kitaalamu za matengenezo ya mabomba kwa ajili ya uvujaji, kuziba, ufungaji, na matatizo mengine ya mabomba.",
-    price: 35000,
-    category: "Plumbing",
-    image_url: "/placeholder.svg?height=300&width=500&text=Plumbing+Repair",
-    duration_minutes: 90,
-    features: ["Leak detection and repair", "Drain unclogging", "Fixture installation", "Pipe replacement"],
-  },
-  {
-    id: 3,
-    name_en: "Electrical Services",
-    name_sw: "Huduma za Umeme",
-    description_en:
-      "Comprehensive electrical services including installations, repairs, and maintenance for your home or office.",
-    description_sw:
-      "Huduma kamili za umeme ikiwa ni pamoja na ufungaji, matengenezo, na matengenezo kwa ajili ya nyumba au ofisi yako.",
-    price: 40000,
-    category: "Electrical",
-    image_url: "/placeholder.svg?height=300&width=500&text=Electrical+Services",
-    duration_minutes: 60,
-    features: [
-      "Wiring installation and repair",
-      "Light fixture installation",
-      "Circuit breaker replacement",
-      "Electrical troubleshooting",
-    ],
-  },
-]
+interface PageProps {
+  params: {
+    serviceId: string
+  }
+}
 
-export default function BookServicePage() {
+export default function BookServicePage({ params }: PageProps) {
   const { user, isLoading } = useAuth()
-  const params = useParams()
   const router = useRouter()
-  const [service, setService] = useState<any>(null)
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
+  const [service, setService] = useState<Service | null>(null)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -75,18 +28,31 @@ export default function BookServicePage() {
   }, [user, isLoading, router, params.serviceId])
 
   useEffect(() => {
-    // Simulate API call to get service details
-    const serviceId = Number(params.serviceId)
-    const foundService = services.find((s) => s.id === serviceId)
-
-    if (foundService) {
-      setService(foundService)
+    const fetchService = async () => {
+      try {
+        const response = await fetch(`/api/services/${params.serviceId}`)
+        if (!response.ok) {
+          throw new Error('Service not found')
+        }
+        const data = await response.json()
+        setService(data)
+      } catch (error) {
+        console.error('Error fetching service:', error)
+        toast({
+          title: "Error",
+          description: "Failed to load service details",
+          variant: "destructive",
+        })
+        router.push("/services")
+      } finally {
+        setLoading(false)
+      }
     }
 
-    // Simulate loading
-    const timer = setTimeout(() => setLoading(false), 500)
-    return () => clearTimeout(timer)
-  }, [params.serviceId])
+    if (params.serviceId) {
+      fetchService()
+    }
+  }, [params.serviceId, router, toast])
 
   if (isLoading || loading) {
     return (

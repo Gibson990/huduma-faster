@@ -6,7 +6,11 @@ export interface User {
   id: number
   name: string
   email: string
-  role: "admin" | "customer"
+  phone?: string
+  address?: string
+  role: "user" | "admin"
+  created_at: Date
+  updated_at: Date
 }
 
 export function hashPassword(password: string): string {

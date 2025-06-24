@@ -12,7 +12,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Banknote, Clock, Calendar } from "lucide-react"
 import { useCart } from "@/lib/cart"
 import { useRouter } from "next/navigation"
-import { useBookings } from "@/lib/bookings"
 import { format } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -45,7 +44,6 @@ const timeSlots = generateTimeSlots()
 
 export function CheckoutForm({ user }: CheckoutFormProps) {
   const { items, clearCart, total } = useCart()
-  const { addBooking } = useBookings()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [date, setDate] = useState<Date | undefined>(undefined)
@@ -73,32 +71,35 @@ export function CheckoutForm({ user }: CheckoutFormProps) {
     setIsSubmitting(true)
 
     try {
-      // Create a booking for each service in the cart
-      const bookingIds = items.map((item) => {
-        const bookingId = addBooking({
-          userId: user.id,
-          serviceId: item.id.toString(),
-          serviceName: item.name_en,
-          servicePrice: item.price * item.quantity,
-          providerName: "Assigned Provider", // Will be assigned later
-          customerName: `${formData.firstName} ${formData.lastName}`,
-          customerEmail: formData.email,
-          customerPhone: formData.phone,
-          serviceAddress: formData.address,
-          scheduledDate: date,
-          scheduledTime: time,
-          status: "pending",
-          paymentStatus: "pending",
-          paymentMethod: formData.paymentMethod,
-          notes: formData.notes,
-          quantity: item.quantity,
+      // Create a booking for each service in the cart by POSTing to the backend
+      const bookingIds: string[] = []
+      for (const item of items) {
+        const response = await fetch("/api/bookings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            serviceId: item.id,
+            userId: user.id,
+            name: `${formData.firstName} ${formData.lastName}`,
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+            date: date.toISOString(),
+            time,
+            notes: formData.notes,
+            paymentMethod: formData.paymentMethod,
+            quantity: item.quantity,
+          }),
         })
-        return bookingId
-      })
-
-      // Clear cart and redirect to success page with the first booking ID
+        if (!response.ok) {
+          throw new Error("Failed to create booking")
+        }
+        const data = await response.json()
+        bookingIds.push(data.id)
+      }
       clearCart()
-
       // If multiple bookings, go to order summary, otherwise go to invoice
       if (bookingIds.length > 1) {
         router.push(`/order-summary?ids=${bookingIds.join(",")}`)

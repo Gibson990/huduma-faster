@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { createContext, useContext, useState, type ReactNode, useEffect } from "react"
 
 export interface Booking {
@@ -158,4 +159,46 @@ export function useBookings() {
     throw new Error("useBookings must be used within a BookingsProvider")
   }
   return context
+}
+
+// Admin hook to fetch bookings from backend
+export function useAdminBookings() {
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchBookings() {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch("/api/bookings")
+        if (!res.ok) throw new Error("Failed to fetch bookings")
+        const data = await res.json()
+        // Convert date strings to Date objects
+        setBookings(data.map(parseDates))
+      } catch (err: any) {
+        setError(err.message || "Unknown error")
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchBookings()
+  }, [])
+
+  const getTotalRevenue = () =>
+    bookings.filter((b) => b.status === "completed").reduce((sum, b) => sum + b.servicePrice, 0)
+  const getPendingBookingsCount = () => bookings.filter((b) => b.status === "pending").length
+  const getCompletedBookingsCount = () => bookings.filter((b) => b.status === "completed").length
+  const getAllBookings = () => bookings
+
+  return {
+    bookings,
+    loading,
+    error,
+    getTotalRevenue,
+    getPendingBookingsCount,
+    getCompletedBookingsCount,
+    getAllBookings,
+  }
 }

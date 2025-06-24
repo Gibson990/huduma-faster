@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/components/auth/auth-provider"
-import { useBookings } from "@/lib/bookings"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -14,7 +13,6 @@ import { generateInvoicePDF } from "@/lib/pdf-generator"
 
 export default function OrderSummaryPage() {
   const { user, isLoading } = useAuth()
-  const { getBookingsByIds } = useBookings()
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -22,7 +20,20 @@ export default function OrderSummaryPage() {
 
   // Get booking IDs from URL
   const bookingIds = searchParams.get("ids")?.split(",") || []
-  const bookings = getBookingsByIds(bookingIds)
+  const [bookings, setBookings] = useState<any[]>([])
+  useEffect(() => {
+    if (bookingIds.length === 0) return;
+    setLoading(true);
+    Promise.all(
+      bookingIds.map((id) =>
+        fetch(`/api/bookings/${id}`)
+          .then((res) => res.ok ? res.json() : null)
+      )
+    ).then((results) => {
+      setBookings(results.filter(Boolean))
+      setLoading(false)
+    })
+  }, [bookingIds])
 
   useEffect(() => {
     if (!isLoading && !user) {
