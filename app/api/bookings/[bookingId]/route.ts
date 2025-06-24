@@ -39,4 +39,33 @@ export async function GET(
       { status: 500 }
     )
   }
+}
+
+export async function PATCH(request: Request, { params }: { params: { bookingId: string } }) {
+  try {
+    const body = await request.json();
+    const fields = [];
+    const values = [];
+    let idx = 1;
+    for (const key in body) {
+      fields.push(`${key} = $${idx}`);
+      values.push(body[key]);
+      idx++;
+    }
+    if (fields.length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
+    values.push(params.bookingId);
+    const result = await query(
+      `UPDATE bookings SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+    return NextResponse.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating booking status:', error);
+    return NextResponse.json({ error: 'Failed to update booking status' }, { status: 500 });
+  }
 } 

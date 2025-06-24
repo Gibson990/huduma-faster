@@ -77,12 +77,18 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+    const status = searchParams.get('status');
+    const unassigned = searchParams.get('unassigned');
+    const location = searchParams.get('location');
+    const serviceId = searchParams.get('serviceId');
 
     let queryString = `
       SELECT 
         b.id,
         b.service_id,
         s.name_en as service_name,
+        b.customer_id,
+        b.provider_id,
         b.customer_name,
         b.customer_email,
         b.customer_phone,
@@ -91,15 +97,34 @@ export async function GET(request: Request) {
         b.booking_time,
         b.total_amount,
         b.status,
-        b.created_at
+        b.notes,
+        b.created_at,
+        p.name as provider_name
       FROM bookings b
       JOIN services s ON b.service_id = s.id
+      LEFT JOIN users p ON b.provider_id = p.id
+      WHERE 1=1
     `;
-    const queryParams = [];
+    const queryParams: any[] = [];
 
     if (userId) {
-      queryString += ' WHERE b.customer_id = $1';
+      queryString += ' AND b.customer_id = $' + (queryParams.length + 1);
       queryParams.push(userId);
+    }
+    if (status) {
+      queryString += ' AND b.status = $' + (queryParams.length + 1);
+      queryParams.push(status);
+    }
+    if (unassigned === 'true') {
+      queryString += ' AND b.provider_id IS NULL';
+    }
+    if (location) {
+      queryString += ' AND b.address ILIKE $' + (queryParams.length + 1);
+      queryParams.push(`%${location}%`);
+    }
+    if (serviceId) {
+      queryString += ' AND b.service_id = $' + (queryParams.length + 1);
+      queryParams.push(serviceId);
     }
 
     queryString += ' ORDER BY b.created_at DESC';

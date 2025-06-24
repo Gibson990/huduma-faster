@@ -38,6 +38,15 @@ const providers = [
   { id: 6, name: "Fatma Hassan" },
 ]
 
+// Add this array for status options
+const statusOptions = [
+  { value: "pending", label: "Pending" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+]
+
 export function RecentBookings({ showAll = false }: { showAll?: boolean }) {
   const { toast } = useToast()
   const [allBookings, setAllBookings] = useState<any[]>([])
@@ -65,9 +74,21 @@ export function RecentBookings({ showAll = false }: { showAll?: boolean }) {
   const [selectedBooking, setSelectedBooking] = useState<any>(null)
   const [selectedProvider, setSelectedProvider] = useState<string>("")
 
-  const handleStatusChange = (bookingId: string, newStatus: string) => {
-    // Removed getAllBookings, but keep updateBooking if needed for local actions
-    // ... existing code ...
+  const handleStatusChange = async (bookingId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (!res.ok) throw new Error("Failed to update status")
+      setAllBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b))
+      )
+      toast({ title: "Status updated", description: `Booking status changed to ${newStatus}` })
+    } catch (err) {
+      toast({ title: "Error", description: "Could not update status", variant: "destructive" })
+    }
   }
 
   const handleAssignProvider = () => {
@@ -137,7 +158,18 @@ export function RecentBookings({ showAll = false }: { showAll?: boolean }) {
                     <Eye className="h-4 w-4" />
                   </Link>
                 </Button>
-                {/* Operational features like status change and provider assignment can be implemented here with backend integration */}
+                <Select value={booking.status} onValueChange={(value) => handleStatusChange(booking.id, value)}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           ))}

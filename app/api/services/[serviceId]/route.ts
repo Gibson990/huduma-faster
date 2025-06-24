@@ -53,4 +53,43 @@ export async function GET(
       { status: 500 }
     )
   }
+}
+
+export async function PATCH(request: Request, { params }: { params: { serviceId: string } }) {
+  try {
+    const body = await request.json();
+    const fields = [];
+    const values = [];
+    let idx = 1;
+    for (const key in body) {
+      fields.push(`${key} = $${idx}`);
+      values.push(body[key]);
+      idx++;
+    }
+    values.push(params.serviceId);
+    const result = await query(
+      `UPDATE services SET ${fields.join(", ")} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Service not found' }, { status: 404 });
+    }
+    return NextResponse.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating service:', error);
+    return NextResponse.json({ error: 'Failed to update service' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request, { params }: { params: { serviceId: string } }) {
+  try {
+    const result = await query('DELETE FROM services WHERE id = $1 RETURNING *', [params.serviceId]);
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Service not found' }, { status: 404 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting service:', error);
+    return NextResponse.json({ error: 'Failed to delete service' }, { status: 500 });
+  }
 } 

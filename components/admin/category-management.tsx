@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,45 +21,9 @@ const iconOptions = [
   { value: "Settings", label: "Settings (Repair)", icon: Settings },
 ]
 
-const mockCategories = [
-  {
-    id: 1,
-    name_en: "Electrical Services",
-    name_sw: "Huduma za Umeme",
-    description_en: "Professional electrical repairs and installations",
-    description_sw: "Ukarabati na usakinishaji wa umeme wa kitaalamu",
-    icon: "Zap",
-    image_url: "/placeholder.svg?height=200&width=300",
-    is_active: true,
-    service_count: 12,
-  },
-  {
-    id: 2,
-    name_en: "Plumbing Services",
-    name_sw: "Huduma za Mabomba",
-    description_en: "Expert plumbing solutions for your home",
-    description_sw: "Suluhisho za kitaalamu za mabomba kwa nyumba yako",
-    icon: "Wrench",
-    image_url: "/placeholder.svg?height=200&width=300",
-    is_active: true,
-    service_count: 8,
-  },
-  {
-    id: 3,
-    name_en: "Cleaning Services",
-    name_sw: "Huduma za Usafi",
-    description_en: "Professional home and office cleaning",
-    description_sw: "Usafi wa kitaalamu wa nyumba na ofisi",
-    icon: "Sparkles",
-    image_url: "/placeholder.svg?height=200&width=300",
-    is_active: true,
-    service_count: 6,
-  },
-]
-
 export function CategoryManagement() {
   const { t, language } = useLanguage()
-  const [categories, setCategories] = useState(mockCategories)
+  const [categories, setCategories] = useState<any[]>([])
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<any>(null)
   const [formData, setFormData] = useState({
@@ -71,19 +35,30 @@ export function CategoryManagement() {
     image_url: "",
   })
 
+  // Fetch categories on mount
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then(setCategories)
+  }, [])
+
   const getIconComponent = (iconName: string) => {
     const iconOption = iconOptions.find((opt) => opt.value === iconName)
     return iconOption ? iconOption.icon : FolderOpen
   }
 
-  const handleAddCategory = () => {
-    const newCategory = {
-      id: Date.now(),
+  const handleAddCategory = async () => {
+    const payload = {
       ...formData,
       is_active: true,
-      service_count: 0,
     }
-    setCategories([...categories, newCategory])
+    const res = await fetch("/api/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const newCategory = await res.json()
+    setCategories((prev) => [newCategory, ...prev])
     setFormData({
       name_en: "",
       name_sw: "",
@@ -107,8 +82,18 @@ export function CategoryManagement() {
     })
   }
 
-  const handleUpdateCategory = () => {
-    setCategories(categories.map((c) => (c.id === editingCategory.id ? { ...c, ...formData } : c)))
+  const handleUpdateCategory = async () => {
+    if (!editingCategory) return
+    const payload = {
+      ...formData,
+    }
+    const res = await fetch(`/api/categories/${editingCategory.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const updated = await res.json()
+    setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
     setEditingCategory(null)
     setFormData({
       name_en: "",
@@ -120,12 +105,21 @@ export function CategoryManagement() {
     })
   }
 
-  const handleDeleteCategory = (id: number) => {
-    setCategories(categories.filter((c) => c.id !== id))
+  const handleDeleteCategory = async (id: number) => {
+    await fetch(`/api/categories/${id}`, { method: "DELETE" })
+    setCategories((prev) => prev.filter((c) => c.id !== id))
   }
 
-  const toggleCategoryStatus = (id: number) => {
-    setCategories(categories.map((c) => (c.id === id ? { ...c, is_active: !c.is_active } : c)))
+  const toggleCategoryStatus = async (id: number) => {
+    const category = categories.find((c) => c.id === id)
+    if (!category) return
+    const res = await fetch(`/api/categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: !category.is_active }),
+    })
+    const updated = await res.json()
+    setCategories((prev) => prev.map((c) => (c.id === id ? updated : c)))
   }
 
   return (

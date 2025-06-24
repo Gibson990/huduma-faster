@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,65 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Package, Plus, Edit, Trash2, Clock } from "lucide-react"
 import { useLanguage } from "@/lib/language"
 
-const mockServices = [
-  {
-    id: 1,
-    name_en: "Electrical Wiring",
-    name_sw: "Uwiring wa Umeme",
-    description_en: "Complete electrical wiring for homes and offices",
-    description_sw: "Uwiring kamili wa umeme kwa nyumba na ofisi",
-    price: 300000,
-    duration_minutes: 180,
-    category_id: 1,
-    category_name: "Electrical Services",
-    image_url: "/placeholder.svg?height=300&width=300",
-    is_active: true,
-    provider_count: 3,
-    booking_count: 45,
-  },
-  {
-    id: 2,
-    name_en: "House Cleaning",
-    name_sw: "Usafi wa Nyumba",
-    description_en: "Deep cleaning for entire house",
-    description_sw: "Usafi wa kina kwa nyumba nzima",
-    price: 160000,
-    duration_minutes: 240,
-    category_id: 3,
-    category_name: "Cleaning Services",
-    image_url: "/placeholder.svg?height=300&width=300",
-    is_active: true,
-    provider_count: 5,
-    booking_count: 78,
-  },
-  {
-    id: 3,
-    name_en: "Pipe Repair",
-    name_sw: "Ukarabati wa Mabomba",
-    description_en: "Fix leaking and broken pipes",
-    description_sw: "Kukarabati mabomba yanayovuja na yaliyovunjika",
-    price: 200000,
-    duration_minutes: 120,
-    category_id: 2,
-    category_name: "Plumbing Services",
-    image_url: "/placeholder.svg?height=300&width=300",
-    is_active: true,
-    provider_count: 2,
-    booking_count: 32,
-  },
-]
-
-const mockCategories = [
-  { id: 1, name: "Electrical Services" },
-  { id: 2, name: "Plumbing Services" },
-  { id: 3, name: "Cleaning Services" },
-  { id: 4, name: "Carpentry" },
-  { id: 5, name: "Painting" },
-]
-
 export function ServiceManagement() {
   const { t, language } = useLanguage()
-  const [services, setServices] = useState(mockServices)
+  const [services, setServices] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingService, setEditingService] = useState<any>(null)
   const [formData, setFormData] = useState({
@@ -84,19 +29,30 @@ export function ServiceManagement() {
     image_url: "",
   })
 
-  const handleAddService = () => {
-    const newService = {
-      id: Date.now(),
+  // Fetch services and categories on mount
+  useEffect(() => {
+    fetch("/api/services")
+      .then((res) => res.json())
+      .then(setServices)
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then(setCategories)
+  }, [])
+
+  const handleAddService = async () => {
+    const payload = {
       ...formData,
-      price: Number.parseFloat(formData.price),
-      duration_minutes: Number.parseInt(formData.duration_minutes),
-      category_id: Number.parseInt(formData.category_id),
-      category_name: mockCategories.find((c) => c.id === Number.parseInt(formData.category_id))?.name || "",
-      is_active: true,
-      provider_count: 0,
-      booking_count: 0,
+      base_price: parseFloat(formData.price),
+      duration_minutes: parseInt(formData.duration_minutes),
+      category_id: parseInt(formData.category_id),
     }
-    setServices([...services, newService])
+    const res = await fetch("/api/services", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const newService = await res.json()
+    setServices((prev) => [newService, ...prev])
     setFormData({
       name_en: "",
       name_sw: "",
@@ -117,28 +73,28 @@ export function ServiceManagement() {
       name_sw: service.name_sw,
       description_en: service.description_en,
       description_sw: service.description_sw,
-      price: service.price.toString(),
-      duration_minutes: service.duration_minutes.toString(),
-      category_id: service.category_id.toString(),
+      price: service.base_price?.toString() || service.price?.toString() || "",
+      duration_minutes: service.duration_minutes?.toString() || "",
+      category_id: service.category_id?.toString() || "",
       image_url: service.image_url,
     })
   }
 
-  const handleUpdateService = () => {
-    setServices(
-      services.map((s) =>
-        s.id === editingService.id
-          ? {
-              ...s,
-              ...formData,
-              price: Number.parseFloat(formData.price),
-              duration_minutes: Number.parseInt(formData.duration_minutes),
-              category_id: Number.parseInt(formData.category_id),
-              category_name: mockCategories.find((c) => c.id === Number.parseInt(formData.category_id))?.name || "",
-            }
-          : s,
-      ),
-    )
+  const handleUpdateService = async () => {
+    if (!editingService) return
+    const payload = {
+      ...formData,
+      base_price: parseFloat(formData.price),
+      duration_minutes: parseInt(formData.duration_minutes),
+      category_id: parseInt(formData.category_id),
+    }
+    const res = await fetch(`/api/services/${editingService.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    const updated = await res.json()
+    setServices((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
     setEditingService(null)
     setFormData({
       name_en: "",
@@ -152,12 +108,21 @@ export function ServiceManagement() {
     })
   }
 
-  const handleDeleteService = (id: number) => {
-    setServices(services.filter((s) => s.id !== id))
+  const handleDeleteService = async (id: number) => {
+    await fetch(`/api/services/${id}`, { method: "DELETE" })
+    setServices((prev) => prev.filter((s) => s.id !== id))
   }
 
-  const toggleServiceStatus = (id: number) => {
-    setServices(services.map((s) => (s.id === id ? { ...s, is_active: !s.is_active } : s)))
+  const toggleServiceStatus = async (id: number) => {
+    const service = services.find((s) => s.id === id)
+    if (!service) return
+    const res = await fetch(`/api/services/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: !service.is_active }),
+    })
+    const updated = await res.json()
+    setServices((prev) => prev.map((s) => (s.id === id ? updated : s)))
   }
 
   return (
@@ -186,6 +151,7 @@ export function ServiceManagement() {
               setFormData={setFormData}
               onSubmit={handleAddService}
               submitLabel="Add Service"
+              categories={categories}
             />
           </DialogContent>
         </Dialog>
@@ -225,7 +191,13 @@ export function ServiceManagement() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Price:</span>
-                    <span className="font-bold text-[#2E7D32]">TSh {service.price.toLocaleString()}</span>
+                    <span className="font-bold text-[#2E7D32]">
+                      TSh {typeof service.price === "number"
+                        ? service.price.toLocaleString()
+                        : typeof service.base_price === "number"
+                          ? service.base_price.toLocaleString()
+                          : "N/A"}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Duration:</span>
@@ -253,7 +225,7 @@ export function ServiceManagement() {
                     variant="outline"
                     size="sm"
                     onClick={() => toggleServiceStatus(service.id)}
-                    className="flex-1"
+                    className={service.is_active ? "flex-1 bg-red-100 text-red-700 hover:bg-red-200" : "flex-1 bg-gray-100 text-gray-800 hover:bg-green-100 hover:text-green-800"}
                   >
                     {service.is_active ? "Deactivate" : "Activate"}
                   </Button>
@@ -283,6 +255,7 @@ export function ServiceManagement() {
             setFormData={setFormData}
             onSubmit={handleUpdateService}
             submitLabel="Update Service"
+            categories={categories}
           />
         </DialogContent>
       </Dialog>
@@ -290,7 +263,7 @@ export function ServiceManagement() {
   )
 }
 
-function ServiceForm({ formData, setFormData, onSubmit, submitLabel }: any) {
+function ServiceForm({ formData, setFormData, onSubmit, submitLabel, categories }: any) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -368,9 +341,14 @@ function ServiceForm({ formData, setFormData, onSubmit, submitLabel }: any) {
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
-              {mockCategories.map((category) => (
+              {categories.map((category: any) => (
                 <SelectItem key={category.id} value={category.id.toString()}>
-                  {category.name}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {category.image_url && (
+                      <img src={category.image_url} alt={category.name_en} style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 4 }} />
+                    )}
+                    {category.name_en}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
